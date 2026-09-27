@@ -53,18 +53,71 @@ function waitForVideo(): Promise<HTMLVideoElement> {
   });
 }
 
-function watchVideo(video: HTMLVideoElement): void {
+// Connect as soon as a video exists rather than on the first event, so the
+// background has its server connection open before the user presses anything.
+waitForVideo().then((video) => {
   console.log("[content] found video element", video);
+  try {
+    port ??= connect();
+  } catch (err) {
+    console.warn("[content] could not reach background, reload the page", err);
+  }
+});
 
-  const report = (type: PlayerEvent["type"]) => {
-    const event: PlayerEvent = { type, position: video.currentTime };
-    console.log(`[content] ${type} at ${event.position.toFixed(2)}s`);
-    send({ type: "player-event", event });
-  };
+// Sites can swap the <video> element at any time (Prime plays a trailer on
+// the title page, then may create a new element for the episode). Media
+// events don't bubble, but a capture listener on the document still sees
+// them from every video, including ones added later.
+const videoIds = new WeakMap<HTMLVideoElement, number>();
+let nextVideoId = 1;
 
-  video.addEventListener("play", () => report("play"));
-  video.addEventListener("pause", () => report("pause"));
-  video.addEventListener("seeked", () => report("seek"));
+function describe(video: HTMLVideoElement): string {
+  let id = videoIds.get(video);
+  if (id === undefined) {
+    id = nextVideoId++;
+    videoIds.set(video, id);
+    console.log(`[content] first event from video #${id}`, video);
+  }
+  const size = `${video.clientWidth}x${video.clientHeight}`;
+  return `video #${id} (${size}${video.muted ? ", muted" : ""})`;
 }
 
-waitForVideo().then(watchVideo);
+// Prime autoplays a muted trailer on the title page next to the episode's
+// video. Ignore a video until it has been heard at least once. Checking
+// `muted` at event time instead would stop syncing a viewer who mutes the
+// episode partway through.
+const heard = new WeakSet<HTMLVideoElement>();
+
+document.addEventListener(
+  "volumechange",
+  (e) => {
+    if (e.target instanceof HTMLVideoElement && !e.target.muted) heard.add(e.target);
+  },
+  true,
+);
+
+const eventTypes: Record<string, PlayerEvent["type"]> = {
+  play: "play",
+  pause: "pause",
+  seeked: "seek",
+};
+
+for (const [domEvent, type] of Object.entries(eventTypes)) {
+  document.addEventListener(
+    domEvent,
+    (e) => {
+      const video = e.target;
+      if (!(video instanceof HTMLVideoElement)) return;
+      const event: PlayerEvent = { type, position: video.currentTime };
+      const line = `[content] ${describe(video)} ${type} at ${event.position.toFixed(2)}s`;
+      if (!video.muted) heard.add(video);
+      if (!heard.has(video)) {
+        console.log(`${line}, ignored (never unmuted)`);
+        return;
+      }
+      console.log(line);
+      send({ type: "player-event", event });
+    },
+    true,
+  );
+}

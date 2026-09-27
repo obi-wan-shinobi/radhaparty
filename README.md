@@ -35,6 +35,8 @@ pnpm build:extension # one-off production build of the extension
 pnpm typecheck       # tsc --noEmit in every package
 ```
 
+The extension connects to `ws://localhost:8787` by default. To point it elsewhere, set `VITE_SERVER_URL` when building, for example `VITE_SERVER_URL=wss://example.com pnpm build:extension`.
+
 ## Test video
 
 `packages/test-page/public/sample.mp4` is git-ignored. It is a 10 minute 1280x720 test pattern with a running counter and a short beep every second. The counter is elapsed time in hundredths of a second with no decimal point, so `12340` means 123.40 s.
