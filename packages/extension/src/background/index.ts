@@ -1,6 +1,7 @@
 import type { ContentRef } from "@radhaparty/shared";
 import type {
   BackgroundToContent,
+  BackgroundToPort,
   ContentReply,
   ContentToBackground,
   PopupRequest,
@@ -17,12 +18,21 @@ console.log("[background] service worker loaded");
 type Session = {
   tabId: number;
   label: string;
+  port: chrome.runtime.Port;
   url: string | undefined;
   roomId: string | null;
   server: ServerConnection | null;
 };
 
 const sessions = new Map<number, Session>();
+
+function postToTab(session: Session, msg: BackgroundToPort): void {
+  try {
+    session.port.postMessage(msg);
+  } catch {
+    // The page is gone. Its onDisconnect cleans up the session.
+  }
+}
 
 // No 0/O or 1/I, so codes are easy to read out. 32 symbols divide 256
 // evenly, so taking a random byte mod 32 is unbiased.
@@ -80,6 +90,7 @@ function joinRoom(session: Session, roomId: string): void {
           `[background] ${session.label} room ${s.roomId} state #${s.seq}: ` +
             `${s.playing ? "playing" : "paused"} at ${s.position.toFixed(2)}s`,
         );
+        postToTab(session, { type: "state", state: s });
       }
     },
   });
@@ -88,6 +99,7 @@ function joinRoom(session: Session, roomId: string): void {
 
 function leaveRoom(session: Session): void {
   if (session.roomId) console.log(`[background] ${session.label} leaving room ${session.roomId}`);
+  postToTab(session, { type: "room-left" });
   session.server?.close();
   session.server = null;
   session.roomId = null;
@@ -107,6 +119,7 @@ chrome.runtime.onConnect.addListener((port) => {
   const session: Session = {
     tabId,
     label: `tab ${tabId}`,
+    port,
     url: tab.url,
     roomId: null,
     server: null,

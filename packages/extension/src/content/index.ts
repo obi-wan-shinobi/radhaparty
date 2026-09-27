@@ -1,11 +1,13 @@
 // Runs in the default isolated world.
 import type {
   BackgroundToContent,
+  BackgroundToPort,
   ContentReply,
   ContentToBackground,
   PlayerEvent,
   PortName,
 } from "../messages";
+import { isSiteReaction, matchesRoom, noteLocalAction, setRoomState } from "./sync";
 
 console.log("[content] loaded on", location.href);
 
@@ -15,8 +17,16 @@ let port: chrome.runtime.Port | null = null;
 
 function connect(): chrome.runtime.Port {
   const p = chrome.runtime.connect({ name: "player" satisfies PortName });
+  p.onMessage.addListener((msg: BackgroundToPort) => {
+    if (msg.type === "state") setRoomState(msg.state, pickVideo);
+    if (msg.type === "room-left") setRoomState(null, pickVideo);
+  });
   p.onDisconnect.addListener(() => {
-    if (port === p) port = null;
+    if (port !== p) return;
+    port = null;
+    // The background's server connection closed with the port. Forget the
+    // room until the background sends its state again.
+    setRoomState(null, pickVideo);
   });
   return p;
 }
@@ -119,6 +129,25 @@ document.addEventListener(
   true,
 );
 
+// The video the room's state is applied to: the last one the viewer used,
+// or failing that the largest one that isn't a muted trailer.
+let activeVideo: HTMLVideoElement | null = null;
+
+function pickVideo(): HTMLVideoElement | null {
+  if (activeVideo?.isConnected) return activeVideo;
+  let best: HTMLVideoElement | null = null;
+  let bestArea = 0;
+  for (const video of document.querySelectorAll("video")) {
+    if (video.muted && !heard.has(video)) continue;
+    const area = video.clientWidth * video.clientHeight;
+    if (area > bestArea) {
+      best = video;
+      bestArea = area;
+    }
+  }
+  return best;
+}
+
 const eventTypes: Record<string, PlayerEvent["type"]> = {
   play: "play",
   pause: "pause",
@@ -138,7 +167,19 @@ for (const [domEvent, type] of Object.entries(eventTypes)) {
         console.log(`${line}, ignored (never unmuted)`);
         return;
       }
+      activeVideo = video;
+      // Events caused by applying the room's state leave the video matching
+      // the room. Only a difference means the viewer did something.
+      if (matchesRoom(video)) {
+        console.log(`${line}, matches the room, not sent`);
+        return;
+      }
+      if (isSiteReaction()) {
+        console.log(`${line}, right after syncing, treated as the site's player reacting, not sent`);
+        return;
+      }
       console.log(line);
+      noteLocalAction();
       send({ type: "player-event", event });
     },
     true,

@@ -74,6 +74,9 @@ export class ServerConnection {
     };
 
     ws.onmessage = (e) => {
+      // Messages can still arrive between close() and the socket closing,
+      // for example from the old room after switching rooms.
+      if (this.closed) return;
       let msg: ServerMessage;
       try {
         msg = JSON.parse(String(e.data)) as ServerMessage;

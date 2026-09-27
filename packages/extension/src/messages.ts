@@ -4,11 +4,16 @@
 // Types only: a runtime export here would make the bundler split the
 // content script into a loader plus a web-accessible chunk.
 
+import type { RoomState } from "@radhaparty/shared";
+
 export type PortName = "player";
 
 export type PlayerEvent = { type: "play" | "pause" | "seek"; position: number };
 
 export type ContentToBackground = { type: "player-event"; event: PlayerEvent };
+
+// Sent over the same port, from the background to the tab's content script.
+export type BackgroundToPort = { type: "state"; state: RoomState } | { type: "room-left" };
 
 // Sent with chrome.tabs.sendMessage when the background has no port for a
 // tab, usually because the service worker restarted and the port closed.
