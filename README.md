@@ -93,11 +93,14 @@ The server accepts WebSocket connections from extensions, from `localhost` pages
 
 ## Sharing the extension
 
-Build it against the deployed server and zip the result:
+The server is deployed at `wss://radhaparty-server.onrender.com`. To build the extension against it and zip it:
 
 ```sh
-VITE_SERVER_URL=wss://your-server.example pnpm build:extension
-cd packages/extension/dist && zip -r ../radhaparty.zip . && cd -
+pnpm package:extension
 ```
 
-Send `packages/extension/radhaparty.zip` to the people you're watching with. They unzip it and use Load unpacked on the unzipped folder, as in "Load the extension in Chrome" above. `pnpm dev:extension` builds against `ws://localhost:8787` again, so rebuild with `VITE_SERVER_URL` before zipping.
+This writes the build to `packages/extension/release` and the zip to `packages/extension/radhaparty.zip`. Your development build in `packages/extension/dist` keeps pointing at `ws://localhost:8787`.
+
+Send the zip to the people you're watching with. They unzip it and use Load unpacked on the unzipped folder, as in "Load the extension in Chrome" above. To join them yourself, load `packages/extension/release` the same way, and turn off your development copy in `chrome://extensions` first: two copies loaded at once would both control the video.
+
+To use a different server, run `VITE_SERVER_URL=wss://your-server.example pnpm --filter @radhaparty/extension package`.

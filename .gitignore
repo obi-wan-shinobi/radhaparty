@@ -9,5 +9,6 @@ dist/
 # Generated test video, not committed
 packages/test-page/public/sample.mp4
 
-# Packaged extension for sharing
+# Packaged extension for sharing (pnpm package:extension)
+packages/extension/release/
 packages/extension/radhaparty.zip

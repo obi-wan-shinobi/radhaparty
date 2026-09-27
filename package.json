@@ -10,6 +10,7 @@
     "dev:test-page": "pnpm --filter @radhaparty/test-page dev",
     "dev:extension": "pnpm --filter @radhaparty/extension dev",
     "build:extension": "pnpm --filter @radhaparty/extension build",
+    "package:extension": "VITE_SERVER_URL=wss://radhaparty-server.onrender.com pnpm --filter @radhaparty/extension package",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

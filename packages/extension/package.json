@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "vite build",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "package": "vite build --outDir release --emptyOutDir && rm -f radhaparty.zip && cd release && zip -qr ../radhaparty.zip ."
   },
   "dependencies": {
     "@radhaparty/shared": "workspace:*"
