@@ -8,11 +8,19 @@ const KEEPALIVE_MS = 20_000;
 const MIN_RETRY_MS = 1_000;
 const MAX_RETRY_MS = 10_000;
 
+export type ConnectionHandlers = {
+  // Called on every (re)connect, before any queued message is sent. The
+  // server forgets a client's room when its socket closes, so this is where
+  // the room is joined again.
+  onOpen: () => void;
+  onMessage: (msg: ServerMessage) => void;
+};
+
 // One WebSocket to the server for one tab. Reconnects with backoff until
 // close() is called.
 export class ServerConnection {
   private readonly label: string;
-  private readonly onMessage: (msg: ServerMessage) => void;
+  private readonly handlers: ConnectionHandlers;
   private ws: WebSocket | null = null;
   // Only the latest unsent message is kept: after an outage, an old play or
   // pause is stale, and only the most recent intent matters.
@@ -22,9 +30,9 @@ export class ServerConnection {
   private retryMs = MIN_RETRY_MS;
   private closed = false;
 
-  constructor(label: string, onMessage: (msg: ServerMessage) => void) {
+  constructor(label: string, handlers: ConnectionHandlers) {
     this.label = label;
-    this.onMessage = onMessage;
+    this.handlers = handlers;
     this.open();
   }
 
@@ -51,6 +59,7 @@ export class ServerConnection {
     ws.onopen = () => {
       console.log(`[background] ${this.label} server connected: ${SERVER_URL}`);
       this.retryMs = MIN_RETRY_MS;
+      this.handlers.onOpen();
       if (this.pending) {
         ws.send(JSON.stringify(this.pending));
         this.pending = null;
@@ -68,7 +77,7 @@ export class ServerConnection {
         console.warn(`[background] ${this.label} bad message from server:`, e.data);
         return;
       }
-      this.onMessage(msg);
+      this.handlers.onMessage(msg);
     };
 
     ws.onclose = () => {
