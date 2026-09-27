@@ -2,7 +2,7 @@
 
 Watch party sync for Prime Video and Apple TV+. Each viewer streams from their own account. A Chrome extension reads and controls the page's `<video>` element, and a WebSocket server holds shared room state.
 
-Work in progress. Play, pause, and seek sync between tabs in the same room. There is no clock sync or drift correction yet, so viewers on different machines can end up out of step.
+Work in progress. Play, pause, and seek sync between tabs in the same room. Each tab measures its clock against the server's, and playing videos that drift apart are brought back in step by briefly adjusting playback speed.
 
 ## Packages
 

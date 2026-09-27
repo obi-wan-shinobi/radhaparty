@@ -13,7 +13,11 @@ export type PlayerEvent = { type: "play" | "pause" | "seek"; position: number };
 export type ContentToBackground = { type: "player-event"; event: PlayerEvent };
 
 // Sent over the same port, from the background to the tab's content script.
-export type BackgroundToPort = { type: "state"; state: RoomState } | { type: "room-left" };
+export type BackgroundToPort =
+  | { type: "state"; state: RoomState }
+  | { type: "room-left" }
+  // Estimated serverClock - ourClock in ms, updated after each ping.
+  | { type: "clock"; offsetMs: number };
 
 // Sent with chrome.tabs.sendMessage when the background has no port for a
 // tab, usually because the service worker restarted and the port closed.

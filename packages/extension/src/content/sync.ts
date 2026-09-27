@@ -12,8 +12,8 @@ import { controls } from "./controls";
 
 // How far the video may be from the room's position before we seek. Paused
 // videos are held tighter so everyone sees the same frame. Playing videos
-// drift a little, and small drift is corrected separately (by rate, later)
-// instead of by seeking.
+// drift a little, and small drift is corrected by adjusting playback speed
+// (see checkDrift) instead of by seeking.
 const PLAYING_TOLERANCE_S = 1.0;
 const PAUSED_TOLERANCE_S = 0.25;
 
@@ -28,7 +28,33 @@ const LOCAL_GRACE_MS = 1000;
 // would start a loop: the room flips, we apply it, the site undoes it.
 const SITE_REACTION_MS = 500;
 
+// Drift correction. Videos that start together slowly drift apart (stalls,
+// decoder timing). Once a second, a playing video's position is compared with
+// the room's. Small drift is closed by playing slightly faster or slower,
+// which is hard to notice and fires no play, pause, or seek events. Drift
+// past PLAYING_TOLERANCE_S is fixed by seeking.
+const DRIFT_CHECK_MS = 1000;
+// A frame lasts 33 to 42ms at 24 to 30fps. Aiming for less than a frame
+// would keep adjusting speed to chase measurement noise.
+const DRIFT_START_S = 0.06; // start adjusting speed above about two frames
+const DRIFT_STOP_S = 0.03; // back to normal speed within about one frame
+const DRIFT_CLOSE_OVER_S = 3; // aim to close the gap over about this long
+const MAX_SPEED_CHANGE = 0.05; // so speed stays between 0.95x and 1.05x
+
+// Seeking a playing video takes time to buffer (a second or more on
+// streaming sites), so it lands behind the room by that much. The next check
+// would seek again and land behind again. So after each seek while playing,
+// measure where it landed and aim that much further ahead next time, and
+// don't seek for drift again right after a seek.
+const MAX_SEEK_LEAD_S = 5;
+const DRIFT_SEEK_COOLDOWN_MS = 3000;
+
 let room: RoomState | null = null;
+let clockOffsetMs = 0; // serverClock - ourClock, from the background's pings
+let driftTimer: ReturnType<typeof setInterval> | undefined;
+let adjusting: HTMLVideoElement | null = null; // video playing at a changed speed
+let seekLeadS = 0; // how far ahead to aim when seeking a playing video
+let measureLead = false; // measure the next landing to update seekLeadS
 let lastLocalAction = -Infinity;
 let lastApplied = -Infinity;
 let deferred: ReturnType<typeof setTimeout> | undefined;
@@ -37,11 +63,16 @@ function tolerance(state: RoomState): number {
   return state.playing ? PLAYING_TOLERANCE_S : PAUSED_TOLERANCE_S;
 }
 
-// Where the room is now. `position` is where it was at `updatedAt`.
-// The server's clock is assumed to match ours until clock sync exists.
+export function setClockOffset(offsetMs: number): void {
+  clockOffsetMs = offsetMs;
+}
+
+// Where the room is now. `position` is where it was at `updatedAt`, which is
+// a time on the server's clock.
 function expectedPosition(state: RoomState): number {
   if (!state.playing) return state.position;
-  return state.position + Math.max(0, Date.now() - state.updatedAt) / 1000;
+  const serverNow = Date.now() + clockOffsetMs;
+  return state.position + Math.max(0, serverNow - state.updatedAt) / 1000;
 }
 
 // True when the video is where the room says it should be.
@@ -67,9 +98,11 @@ async function apply(video: HTMLVideoElement, state: RoomState): Promise<void> {
   // aren't reported.
   const target = expectedPosition(state);
   if (Math.abs(video.currentTime - target) > tolerance(state)) {
-    console.log(`[content] sync: seeking ${video.currentTime.toFixed(2)}s -> ${target.toFixed(2)}s`);
+    const aim = state.playing ? target + seekLeadS : target;
+    console.log(`[content] sync: seeking ${video.currentTime.toFixed(2)}s -> ${aim.toFixed(2)}s`);
     lastApplied = performance.now();
-    video.currentTime = target;
+    measureLead = state.playing;
+    video.currentTime = aim;
   }
   if (state.playing && video.paused) {
     console.log("[content] sync: play");
@@ -98,11 +131,70 @@ function applyLatest(getVideo: () => HTMLVideoElement | null): void {
   void apply(video, room);
 }
 
+function resetSpeed(): void {
+  if (!adjusting) return;
+  adjusting.playbackRate = 1;
+  console.log("[content] sync: back to normal speed");
+  adjusting = null;
+}
+
+function checkDrift(getVideo: () => HTMLVideoElement | null): void {
+  const video = getVideo();
+  const settling = deferred !== undefined || performance.now() - lastLocalAction < LOCAL_GRACE_MS;
+  // readyState below HAVE_FUTURE_DATA means the video is buffering and its
+  // position is frozen, so drift measured now would be misleading.
+  const buffering = video ? video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA : false;
+  if (!room?.playing || !video || video.paused || video.seeking || buffering || settling) {
+    resetSpeed();
+    return;
+  }
+  if (adjusting && adjusting !== video) resetSpeed();
+
+  const drift = video.currentTime - expectedPosition(room); // positive: we're ahead
+  const size = Math.abs(drift);
+
+  if (measureLead) {
+    measureLead = false;
+    const lead = Math.min(MAX_SEEK_LEAD_S, Math.max(0, seekLeadS - drift));
+    if (Math.abs(lead - seekLeadS) >= 0.05) {
+      console.log(`[content] sync: seeks land ${(-drift).toFixed(2)}s behind, aiming ${lead.toFixed(2)}s ahead from now on`);
+    }
+    seekLeadS = lead;
+  }
+
+  if (size > PLAYING_TOLERANCE_S) {
+    resetSpeed();
+    if (performance.now() - lastApplied >= DRIFT_SEEK_COOLDOWN_MS) void apply(video, room);
+    return;
+  }
+  if (size < (adjusting ? DRIFT_STOP_S : DRIFT_START_S)) {
+    resetSpeed();
+    return;
+  }
+
+  const change = Math.min(MAX_SPEED_CHANGE, size / DRIFT_CLOSE_OVER_S);
+  const rate = drift > 0 ? 1 - change : 1 + change;
+  if (!adjusting) {
+    console.log(
+      `[content] sync: ${size.toFixed(2)}s ${drift > 0 ? "ahead" : "behind"}, ` +
+        `playing at ${rate.toFixed(3)}x to catch up`,
+    );
+  }
+  adjusting = video;
+  video.playbackRate = rate;
+}
+
 export function setRoomState(state: RoomState | null, getVideo: () => HTMLVideoElement | null): void {
   room = state;
   clearTimeout(deferred);
   deferred = undefined;
-  if (!state) return;
+  if (!state) {
+    clearInterval(driftTimer);
+    driftTimer = undefined;
+    resetSpeed();
+    return;
+  }
+  driftTimer ??= setInterval(() => checkDrift(getVideo), DRIFT_CHECK_MS);
 
   const wait = lastLocalAction + LOCAL_GRACE_MS - performance.now();
   if (wait > 0) {

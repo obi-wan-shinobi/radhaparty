@@ -7,7 +7,7 @@ import type {
   PlayerEvent,
   PortName,
 } from "../messages";
-import { isSiteReaction, matchesRoom, noteLocalAction, setRoomState } from "./sync";
+import { isSiteReaction, matchesRoom, noteLocalAction, setClockOffset, setRoomState } from "./sync";
 
 console.log("[content] loaded on", location.href);
 
@@ -20,6 +20,7 @@ function connect(): chrome.runtime.Port {
   p.onMessage.addListener((msg: BackgroundToPort) => {
     if (msg.type === "state") setRoomState(msg.state, pickVideo);
     if (msg.type === "room-left") setRoomState(null, pickVideo);
+    if (msg.type === "clock") setClockOffset(msg.offsetMs);
   });
   p.onDisconnect.addListener(() => {
     if (port !== p) return;

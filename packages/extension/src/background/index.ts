@@ -75,16 +75,26 @@ function joinRoom(session: Session, roomId: string): void {
   session.roomId = roomId;
   console.log(`[background] ${session.label} joining room ${roomId}`);
 
+  let loggedOffset: number | null = null;
   const server = new ServerConnection(session.label, {
     // Runs on every reconnect too: the server forgets a client's room when
     // its socket closes.
     onOpen: () => {
       server.send({ type: "join", roomId, content: contentFromUrl(session.url) });
     },
+    onClock: (offsetMs, roundTripMs) => {
+      postToTab(session, { type: "clock", offsetMs });
+      // Log only noticeable changes; this runs after every keepalive ping.
+      if (loggedOffset === null || Math.abs(offsetMs - loggedOffset) >= 10) {
+        loggedOffset = offsetMs;
+        console.log(
+          `[background] ${session.label} server clock is ${Math.round(offsetMs)}ms ` +
+            `ahead of ours (round trip ${roundTripMs}ms)`,
+        );
+      }
+    },
     onMessage: (msg) => {
-      if (msg.type === "pong") {
-        console.log(`[background] ${session.label} pong, round trip ${Date.now() - msg.t0}ms`);
-      } else if (msg.type === "state") {
+      if (msg.type === "state") {
         const s = msg.state;
         console.log(
           `[background] ${session.label} room ${s.roomId} state #${s.seq}: ` +
