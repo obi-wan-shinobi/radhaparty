@@ -12,8 +12,20 @@ export default defineManifest({
   name: "radhaparty",
   description: "Watch party sync for Prime Video and Apple TV+",
   version: pkg.version,
+  // PNGs rendered from icons/peacock-feather.svg. Files in public/ are
+  // copied to the root of dist.
+  icons: {
+    16: "icons/icon-16.png",
+    32: "icons/icon-32.png",
+    48: "icons/icon-48.png",
+    128: "icons/icon-128.png",
+  },
   action: {
     default_popup: "src/popup/index.html",
+    default_icon: {
+      16: "icons/icon-16.png",
+      32: "icons/icon-32.png",
+    },
   },
   background: {
     service_worker: "src/background/index.ts",
