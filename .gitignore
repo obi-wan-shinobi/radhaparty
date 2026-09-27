@@ -8,3 +8,6 @@ dist/
 
 # Generated test video, not committed
 packages/test-page/public/sample.mp4
+
+# Packaged extension for sharing
+packages/extension/radhaparty.zip

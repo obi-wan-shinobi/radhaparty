@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/index.cjs --external:bufferutil --external:utf-8-validate",
+    "start": "node dist/index.cjs",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
@@ -15,6 +16,7 @@
   "devDependencies": {
     "@types/node": "^22",
     "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15"
   }
 }

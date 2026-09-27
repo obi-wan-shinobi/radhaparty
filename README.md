@@ -71,3 +71,33 @@ A tab only connects to the server while it is in a room. With a video open, clic
 - **Leave room** disconnects this tab from the server.
 
 A tab stays in its room across page reloads. It leaves when you click Leave room or close the tab.
+
+## Deploying the server
+
+The server keeps rooms in memory, so run exactly one instance. A restart or redeploy clears all rooms; tabs reconnect and rejoin by themselves, but the room starts again from paused at 0.
+
+The `Dockerfile` at the repo root builds the server into one bundled file (`packages/server/dist/index.cjs`) and runs it with plain Node. Any host that builds from a Dockerfile works. The host must:
+
+- set `PORT` (most do this automatically),
+- serve it over HTTPS so the extension can use `wss://`,
+- use `/health` as the health check path.
+
+To run the production build locally:
+
+```sh
+pnpm --filter @radhaparty/server build
+pnpm --filter @radhaparty/server start
+```
+
+The server accepts WebSocket connections from extensions, from `localhost` pages, and from clients that send no `Origin` header. Connections from other websites are rejected.
+
+## Sharing the extension
+
+Build it against the deployed server and zip the result:
+
+```sh
+VITE_SERVER_URL=wss://your-server.example pnpm build:extension
+cd packages/extension/dist && zip -r ../radhaparty.zip . && cd -
+```
+
+Send `packages/extension/radhaparty.zip` to the people you're watching with. They unzip it and use Load unpacked on the unzipped folder, as in "Load the extension in Chrome" above. `pnpm dev:extension` builds against `ws://localhost:8787` again, so rebuild with `VITE_SERVER_URL` before zipping.
