@@ -44,6 +44,10 @@ export class ServerConnection {
     }
   }
 
+  isOpen(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
   close(): void {
     this.closed = true;
     clearInterval(this.keepalive);

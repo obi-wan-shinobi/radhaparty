@@ -26,5 +26,8 @@ export default defineManifest({
       run_at: "document_idle",
     },
   ],
+  // storage: remembers each tab's room across page reloads and service
+  // worker restarts (chrome.storage.session).
+  permissions: ["storage"],
   host_permissions: matches,
 });

@@ -2,14 +2,14 @@
 
 Watch party sync for Prime Video and Apple TV+. Each viewer streams from their own account. A Chrome extension reads and controls the page's `<video>` element, and a WebSocket server holds shared room state.
 
-This repo is currently scaffolding only. Every source file is a stub that logs when it loads.
+Work in progress. The extension reports play, pause, and seek to the server, and the server keeps a shared state per room, but videos don't follow that state yet.
 
 ## Packages
 
 | Package | What it is |
 | --- | --- |
 | `packages/shared` | Shared TypeScript types (`RoomState`, `ClientMessage`, `ServerMessage`, `PlayerAdapter`). No runtime code. |
-| `packages/server` | Node WebSocket server (`ws`). Logs connections, disconnections, and messages. |
+| `packages/server` | Node WebSocket server (`ws`). Keeps the state of each room and sends it to everyone in the room. |
 | `packages/test-page` | Vite page with one `<video controls>` element playing `/sample.mp4`. Used for development before touching real streaming sites. |
 | `packages/extension` | Chrome Manifest V3 extension: background service worker, content script, popup. Built with Vite and `@crxjs/vite-plugin`. |
 
@@ -61,3 +61,13 @@ You can also drop in any MP4 of your own at that path.
 4. After a rebuild, click the reload icon on the extension card, then reload the page.
 
 The content script runs on `http://localhost/*` (any port), `https://www.primevideo.com/*`, and `https://tv.apple.com/*`. Open the test page and check the page's DevTools console for `[content] loaded on ...`. The service worker log is under "Inspect views: service worker" on the extension card.
+
+## Rooms
+
+A tab only connects to the server while it is in a room. With a video open, click the extension's toolbar icon:
+
+- **Create room** puts this tab in a new room and shows a 6 character code to share.
+- **Join room** puts this tab in the room with the code you type.
+- **Leave room** disconnects this tab from the server.
+
+A tab stays in its room across page reloads. It leaves when you click Leave room or close the tab.

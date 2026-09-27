@@ -4,13 +4,43 @@
     <meta charset="UTF-8" />
     <title>radhaparty</title>
     <style>
-      body { width: 220px; padding: 12px; font-family: system-ui, sans-serif; }
-      button { display: block; width: 100%; margin-bottom: 8px; padding: 8px; }
+      :root { color-scheme: light dark; }
+      body { width: 240px; margin: 0; padding: 12px; font: 14px system-ui, sans-serif; }
+      h1 { font-size: 15px; margin: 0 0 10px; }
+      p { margin: 0 0 10px; }
+      button, input { box-sizing: border-box; width: 100%; padding: 8px; font: inherit; }
+      button { margin-bottom: 8px; cursor: pointer; }
+      button:disabled { cursor: default; }
+      input { margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.1em; }
+      input::placeholder { text-transform: none; letter-spacing: normal; }
+      .divider { margin: 4px 0 8px; font-size: 12px; opacity: 0.7; text-align: center; }
+      .code { font: 600 22px ui-monospace, monospace; letter-spacing: 0.15em; margin-bottom: 4px; }
+      #connection { font-size: 12px; opacity: 0.7; }
+      #message:empty { display: none; }
+      #message { font-size: 13px; }
     </style>
   </head>
   <body>
-    <button id="create-room" type="button">Create room</button>
-    <button id="join-room" type="button">Join room</button>
+    <h1>radhaparty</h1>
+    <p id="message"></p>
+
+    <section id="no-room" hidden>
+      <button id="create-room" type="button">Create room</button>
+      <p class="divider">or join one</p>
+      <form id="join-form">
+        <input id="room-code" placeholder="Room code" maxlength="32" autocomplete="off" spellcheck="false" />
+        <button id="join-room" type="submit">Join room</button>
+      </form>
+    </section>
+
+    <section id="in-room" hidden>
+      <p>You're in room</p>
+      <p class="code" id="room-id"></p>
+      <p id="connection"></p>
+      <button id="copy-code" type="button">Copy code</button>
+      <button id="leave-room" type="button">Leave room</button>
+    </section>
+
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

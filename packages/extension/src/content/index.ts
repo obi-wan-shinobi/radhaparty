@@ -1,5 +1,11 @@
 // Runs in the default isolated world.
-import type { ContentToBackground, PlayerEvent, PortName } from "../messages";
+import type {
+  BackgroundToContent,
+  ContentReply,
+  ContentToBackground,
+  PlayerEvent,
+  PortName,
+} from "../messages";
 
 console.log("[content] loaded on", location.href);
 
@@ -32,6 +38,23 @@ function send(msg: ContentToBackground): void {
     }
   }
 }
+
+// The service worker loses its ports when Chrome restarts it. When the popup
+// then asks about this tab, the background asks us to connect again.
+chrome.runtime.onMessage.addListener(
+  (msg: BackgroundToContent, _sender, sendResponse: (reply: ContentReply) => void) => {
+    if (msg.type !== "reconnect") return;
+    const hasVideo = document.querySelector("video") !== null;
+    if (hasVideo) {
+      try {
+        port ??= connect();
+      } catch (err) {
+        console.warn("[content] could not reach background, reload the page", err);
+      }
+    }
+    sendResponse({ hasVideo });
+  },
+);
 
 // Streaming sites insert the <video> after page load, so wait for it
 // instead of assuming it exists when the script runs.
