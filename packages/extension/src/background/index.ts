@@ -65,9 +65,12 @@ async function saveRoom(tabId: number, roomId: string | null): Promise<void> {
 // episode IDs from the page.
 function contentFromUrl(url: string | undefined): ContentRef {
   const { hostname, pathname } = new URL(url ?? "http://unknown/");
-  const service =
-    hostname === "www.primevideo.com" ? "prime" : hostname === "tv.apple.com" ? "appletv" : "test";
-  return { service, titleId: pathname };
+  const services: Record<string, ContentRef["service"]> = {
+    "www.primevideo.com": "prime",
+    "tv.apple.com": "appletv",
+    "www.hotstar.com": "hotstar",
+  };
+  return { service: services[hostname] ?? "test", titleId: pathname };
 }
 
 function joinRoom(session: Session, roomId: string): void {

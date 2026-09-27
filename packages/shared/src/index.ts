@@ -1,4 +1,4 @@
-export type ContentRef = { service: "prime" | "appletv" | "test"; titleId: string; episodeId?: string };
+export type ContentRef = { service: "prime" | "appletv" | "hotstar" | "test"; titleId: string; episodeId?: string };
 
 export type RoomState = {
   roomId: string;

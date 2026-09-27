@@ -20,7 +20,7 @@ function render(status: PopupStatus): void {
   inRoom.hidden = !status.hasVideo || status.roomId === null;
   if (!status.hasVideo) {
     message.textContent =
-      "No video on this page. Open a title on Prime Video or Apple TV, or the test page.";
+      "No video on this page. Open a title on Prime Video, Apple TV, or JioHotstar, or the test page.";
     return;
   }
   if (message.textContent?.startsWith("No video")) message.textContent = "";

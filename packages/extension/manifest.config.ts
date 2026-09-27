@@ -5,12 +5,14 @@ const matches = [
   "http://localhost/*",
   "https://www.primevideo.com/*",
   "https://tv.apple.com/*",
+  // JioHotstar. jiohotstar.com redirects here.
+  "https://www.hotstar.com/*",
 ];
 
 export default defineManifest({
   manifest_version: 3,
   name: "radhaparty",
-  description: "Watch party sync for Prime Video and Apple TV+",
+  description: "Watch party sync for Prime Video, Apple TV+, and JioHotstar",
   version: pkg.version,
   // PNGs rendered from icons/peacock-feather.svg. Files in public/ are
   // copied to the root of dist.

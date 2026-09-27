@@ -3,7 +3,7 @@ import type { ClientMessage, ContentRef } from "@radhaparty/shared";
 // Messages come from the network, so check every field before trusting it.
 // Each branch rebuilds the message so unknown extra fields are dropped.
 
-const SERVICES: readonly ContentRef["service"][] = ["prime", "appletv", "test"];
+const SERVICES: readonly ContentRef["service"][] = ["prime", "appletv", "hotstar", "test"];
 const ACTIONS = ["play", "pause", "seek"] as const;
 const ROOM_ID = /^[A-Za-z0-9_-]{1,32}$/;
 const MAX_ID_LENGTH = 500;

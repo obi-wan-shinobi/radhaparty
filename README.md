@@ -1,6 +1,6 @@
 # radhaparty
 
-Watch party sync for Prime Video and Apple TV+. Each viewer streams from their own account. A Chrome extension reads and controls the page's `<video>` element, and a WebSocket server holds shared room state.
+Watch party sync for Prime Video, Apple TV+, and JioHotstar. Each viewer streams from their own account. A Chrome extension reads and controls the page's `<video>` element, and a WebSocket server holds shared room state.
 
 Work in progress. Play, pause, and seek sync between tabs in the same room. Each tab measures its clock against the server's, and playing videos that drift apart are brought back in step by briefly adjusting playback speed.
 
@@ -60,7 +60,7 @@ You can also drop in any MP4 of your own at that path.
 3. Click "Load unpacked" and select `packages/extension/dist`.
 4. After a rebuild, click the reload icon on the extension card, then reload the page.
 
-The content script runs on `http://localhost/*` (any port), `https://www.primevideo.com/*`, and `https://tv.apple.com/*`. Open the test page and check the page's DevTools console for `[content] loaded on ...`. The service worker log is under "Inspect views: service worker" on the extension card.
+The content script runs on `http://localhost/*` (any port), `https://www.primevideo.com/*`, `https://tv.apple.com/*`, and `https://www.hotstar.com/*` (JioHotstar). Open the test page and check the page's DevTools console for `[content] loaded on ...`. The service worker log is under "Inspect views: service worker" on the extension card.
 
 ## Rooms
 
