@@ -99,7 +99,7 @@ The server is deployed at `wss://radhaparty-server.onrender.com`. To build the e
 pnpm package:extension
 ```
 
-This writes the build to `packages/extension/release` and the zip to `packages/extension/radhaparty.zip`. Your development build in `packages/extension/dist` keeps pointing at `ws://localhost:8787`.
+This writes the build to `packages/extension/release` and the zip to `packages/extension/radhaparty-<version>.zip`, for example `radhaparty-0.0.1.zip`. The version comes from `packages/extension/package.json`. Your development build in `packages/extension/dist` keeps pointing at `ws://localhost:8787`.
 
 Send the zip to the people you're watching with. They unzip it and use Load unpacked on the unzipped folder, as in "Load the extension in Chrome" above. To join them yourself, load `packages/extension/release` the same way, and turn off your development copy in `chrome://extensions` first: two copies loaded at once would both control the video.
 

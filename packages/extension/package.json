@@ -1,13 +1,13 @@
 {
   "name": "@radhaparty/extension",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p .",
-    "package": "vite build --outDir release --emptyOutDir && rm -f radhaparty.zip && cd release && zip -qr ../radhaparty.zip ."
+    "package": "vite build --outDir release --emptyOutDir && rm -f radhaparty-*.zip && cd release && zip -qr ../radhaparty-$npm_package_version.zip ."
   },
   "dependencies": {
     "@radhaparty/shared": "workspace:*"
