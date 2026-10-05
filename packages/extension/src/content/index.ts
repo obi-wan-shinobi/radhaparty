@@ -13,6 +13,7 @@ import {
   noteLocalAction,
   setClockOffset,
   setRoomState,
+  updateBanner,
 } from "./sync";
 import { calibrate, isAdShowing, showTime, tick } from "./timeline";
 
@@ -228,4 +229,5 @@ setInterval(() => {
   if (!ad) adEndedAt = performance.now();
   console.log(`[content] ${ad ? "ad started, holding the room" : "ad ended"}`);
   send({ type: "status", blocked: ad });
+  updateBanner();
 }, TICK_MS);

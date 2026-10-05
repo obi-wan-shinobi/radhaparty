@@ -1,5 +1,6 @@
 import type { RoomState } from "@radhaparty/shared";
 import { controls } from "./controls";
+import { setBanner } from "./overlay";
 import { isAdShowing, showTime, streamTime } from "./timeline";
 
 // Makes the page's video follow the room's state, and decides which video
@@ -204,8 +205,24 @@ function checkDrift(getVideo: () => HTMLVideoElement | null): void {
   video.playbackRate = rate;
 }
 
+// Tells the viewer why their video is paused while the room waits for an ad.
+// Not shown to someone watching an ad themselves.
+export function updateBanner(): void {
+  const waiting = room?.playing ? room.waiting.length : 0;
+  if (waiting === 0 || isAdShowing()) {
+    setBanner(null);
+    return;
+  }
+  setBanner(
+    waiting === 1
+      ? "Waiting for 1 person's ad to finish"
+      : `Waiting for ${waiting} people's ads to finish`,
+  );
+}
+
 export function setRoomState(state: RoomState | null, getVideo: () => HTMLVideoElement | null): void {
   room = state;
+  updateBanner();
   clearTimeout(deferred);
   deferred = undefined;
   if (!state) {
