@@ -10,7 +10,10 @@ export type PortName = "player";
 
 export type PlayerEvent = { type: "play" | "pause" | "seek"; position: number };
 
-export type ContentToBackground = { type: "player-event"; event: PlayerEvent };
+export type ContentToBackground =
+  | { type: "player-event"; event: PlayerEvent }
+  // Sent when the tab starts or stops being blocked by an ad.
+  | { type: "status"; blocked: boolean };
 
 // Sent over the same port, from the background to the tab's content script.
 export type BackgroundToPort =

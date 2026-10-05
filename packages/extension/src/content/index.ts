@@ -7,7 +7,14 @@ import type {
   PlayerEvent,
   PortName,
 } from "../messages";
-import { isSiteReaction, matchesRoom, noteLocalAction, setClockOffset, setRoomState } from "./sync";
+import {
+  isSiteReaction,
+  matchesRoom,
+  noteLocalAction,
+  setClockOffset,
+  setRoomState,
+} from "./sync";
+import { calibrate, isAdShowing, showTime, tick } from "./timeline";
 
 console.log("[content] loaded on", location.href);
 
@@ -161,7 +168,9 @@ for (const [domEvent, type] of Object.entries(eventTypes)) {
     (e) => {
       const video = e.target;
       if (!(video instanceof HTMLVideoElement)) return;
-      const event: PlayerEvent = { type, position: video.currentTime };
+      // Show time, not stream time: ads spliced into the stream would
+      // otherwise put viewers on different scenes (see timeline.ts).
+      const event: PlayerEvent = { type, position: showTime(video) };
       const line = `[content] ${describe(video)} ${type} at ${event.position.toFixed(2)}s`;
       if (!video.muted) heard.add(video);
       if (!heard.has(video)) {
@@ -169,6 +178,17 @@ for (const [domEvent, type] of Object.entries(eventTypes)) {
         return;
       }
       activeVideo = video;
+      // Play, pause, and seek during an ad are about the ad, not the show.
+      if (isAdShowing()) {
+        console.log(`${line}, in an ad, not sent`);
+        return;
+      }
+      // Players fire their own play and seek events while switching from an
+      // ad back to the show.
+      if (performance.now() - adEndedAt < AFTER_AD_MS) {
+        console.log(`${line}, just after an ad, not sent`);
+        return;
+      }
       // Events caused by applying the room's state leave the video matching
       // the room. Only a difference means the viewer did something.
       if (matchesRoom(video)) {
@@ -186,3 +206,26 @@ for (const [domEvent, type] of Object.entries(eventTypes)) {
     true,
   );
 }
+
+// Watch for ads. Ad spans must be recorded whether or not we're in a room
+// (a pre-roll usually plays before anyone joins), so this always runs. While
+// an ad shows, the room is held for everyone. When it ends, the server sends
+// a new state once it hears, and applying that brings everyone back in step.
+const TICK_MS = 100;
+const CALIBRATE_EVERY = 20; // ticks, so every 2s
+const AFTER_AD_MS = 1500;
+let inAd = false;
+let adEndedAt = -Infinity;
+let ticks = 0;
+
+setInterval(() => {
+  const video = pickVideo();
+  if (!video) return;
+  const ad = tick(video);
+  if (++ticks % CALIBRATE_EVERY === 0) calibrate(video);
+  if (ad === inAd) return;
+  inAd = ad;
+  if (!ad) adEndedAt = performance.now();
+  console.log(`[content] ${ad ? "ad started, holding the room" : "ad ended"}`);
+  send({ type: "status", blocked: ad });
+}, TICK_MS);

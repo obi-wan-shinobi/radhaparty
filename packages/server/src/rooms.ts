@@ -18,8 +18,24 @@ function broadcast(room: Room): void {
   for (const client of room.clients) send(client, msg);
 }
 
+// `playing` is what viewers asked for. While anyone is waiting (in an ad),
+// the room is held paused for everyone, and resumes when the last one is done.
+function isMoving(state: RoomState): boolean {
+  return state.playing && state.waiting.length === 0;
+}
+
+// `position` is where the room was at `updatedAt`. Before the room starts or
+// stops moving, move that anchor to now, so the position isn't counted
+// forward over time the room spent held.
+function reanchor(state: RoomState, now: number): void {
+  if (isMoving(state)) state.position += (now - state.updatedAt) / 1000;
+  state.updatedAt = now;
+}
+
 function describe(state: RoomState): string {
-  return `#${state.seq} ${state.playing ? "playing" : "paused"} at ${state.position.toFixed(2)}s`;
+  const held = state.playing && state.waiting.length > 0;
+  const status = held ? `held for ${state.waiting.length} in an ad` : state.playing ? "playing" : "paused";
+  return `#${state.seq} ${status} at ${state.position.toFixed(2)}s`;
 }
 
 // Puts the client in a room, creating the room if needed, and sends the
@@ -69,7 +85,32 @@ export function leave(client: Client): void {
   if (room.clients.size === 0) {
     rooms.delete(roomId);
     console.log(`[server] room ${roomId} deleted`);
+    return;
   }
+  // Someone leaving mid-ad shouldn't hold the room forever.
+  if (room.state.waiting.includes(client.id)) updateWaiting(room, client.id, false);
+}
+
+function updateWaiting(room: Room, clientId: string, blocked: boolean): void {
+  const state = room.state;
+  reanchor(state, Date.now());
+  state.waiting = blocked
+    ? [...state.waiting, clientId]
+    : state.waiting.filter((id) => id !== clientId);
+  state.seq += 1;
+  console.log(
+    `[server] room ${state.roomId} ${clientId} ${blocked ? "is in an ad" : "is out of an ad"}: ${describe(state)}`,
+  );
+  broadcast(room);
+}
+
+// A client reports when it starts or stops being blocked, for example by an
+// ad. The room is held until no one is blocked.
+export function setBlocked(client: Client, blocked: boolean): void {
+  const room = client.roomId ? rooms.get(client.roomId) : undefined;
+  if (!room) return;
+  if (room.state.waiting.includes(client.id) === blocked) return;
+  updateWaiting(room, client.id, blocked);
 }
 
 // Applies a play, pause, or seek to the client's room and sends the new

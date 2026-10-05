@@ -4,6 +4,8 @@ Watch party sync for Prime Video, Apple TV+, and JioHotstar. Each viewer streams
 
 Work in progress. Play, pause, and seek sync between tabs in the same room. Each tab measures its clock against the server's, and playing videos that drift apart are brought back in step by briefly adjusting playback speed.
 
+Ads: when anyone in a room is watching an ad, the room is held paused for everyone until it ends. Prime Video splices ads into the same stream as the show, so the extension records where each ad played and syncs the show's own time rather than the stream's. Ad detection is currently only implemented for Prime Video.
+
 ## Packages
 
 | Package | What it is |

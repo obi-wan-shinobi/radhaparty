@@ -1,5 +1,6 @@
 import type { RoomState } from "@radhaparty/shared";
 import { controls } from "./controls";
+import { isAdShowing, showTime, streamTime } from "./timeline";
 
 // Makes the page's video follow the room's state, and decides which video
 // events are the viewer's own actions.
@@ -9,6 +10,10 @@ import { controls } from "./controls";
 // which events we caused, an event is only reported when the video no longer
 // matches the room. Events caused by applying the room's state leave the
 // video matching it, so they are never sent back.
+//
+// Positions are show time, not the video's stream time (see timeline.ts).
+// While an ad is showing, the video is left alone: pausing or seeking it
+// would stop the ad from finishing, and the room is held until it does.
 
 // How far the video may be from the room's position before we seek. Paused
 // videos are held tighter so everyone sees the same frame. Playing videos
@@ -59,8 +64,14 @@ let lastLocalAction = -Infinity;
 let lastApplied = -Infinity;
 let deferred: ReturnType<typeof setTimeout> | undefined;
 
+// `playing` is what viewers asked for; the room is held paused while anyone
+// is waiting on an ad.
+function isMoving(state: RoomState): boolean {
+  return state.playing && state.waiting.length === 0;
+}
+
 function tolerance(state: RoomState): number {
-  return state.playing ? PLAYING_TOLERANCE_S : PAUSED_TOLERANCE_S;
+  return isMoving(state) ? PLAYING_TOLERANCE_S : PAUSED_TOLERANCE_S;
 }
 
 export function setClockOffset(offsetMs: number): void {
@@ -70,7 +81,7 @@ export function setClockOffset(offsetMs: number): void {
 // Where the room is now. `position` is where it was at `updatedAt`, which is
 // a time on the server's clock.
 function expectedPosition(state: RoomState): number {
-  if (!state.playing) return state.position;
+  if (!isMoving(state)) return state.position;
   const serverNow = Date.now() + clockOffsetMs;
   return state.position + Math.max(0, serverNow - state.updatedAt) / 1000;
 }
@@ -79,8 +90,8 @@ function expectedPosition(state: RoomState): number {
 export function matchesRoom(video: HTMLVideoElement): boolean {
   if (!room) return false;
   return (
-    !video.paused === room.playing &&
-    Math.abs(video.currentTime - expectedPosition(room)) <= tolerance(room)
+    !video.paused === isMoving(room) &&
+    Math.abs(showTime(video) - expectedPosition(room)) <= tolerance(room)
   );
 }
 
@@ -93,18 +104,27 @@ export function noteLocalAction(): void {
 }
 
 async function apply(video: HTMLVideoElement, state: RoomState): Promise<void> {
+  if (isAdShowing()) {
+    console.log("[content] sync: in an ad, leaving the video alone until it ends");
+    return;
+  }
+  const moving = isMoving(state);
+  if (state.playing && !moving) {
+    console.log(`[content] sync: holding for ${state.waiting.length} viewer(s) in an ad`);
+  }
   // Seek before play or pause. The play and pause events then fire with
   // the video already at the room's position, so they match the room and
   // aren't reported.
   const target = expectedPosition(state);
-  if (Math.abs(video.currentTime - target) > tolerance(state)) {
-    const aim = state.playing ? target + seekLeadS : target;
-    console.log(`[content] sync: seeking ${video.currentTime.toFixed(2)}s -> ${aim.toFixed(2)}s`);
+  const current = showTime(video);
+  if (Math.abs(current - target) > tolerance(state)) {
+    const aim = moving ? target + seekLeadS : target;
+    console.log(`[content] sync: seeking ${current.toFixed(2)}s -> ${aim.toFixed(2)}s`);
     lastApplied = performance.now();
-    measureLead = state.playing;
-    video.currentTime = aim;
+    measureLead = moving;
+    video.currentTime = streamTime(video, aim);
   }
-  if (state.playing && video.paused) {
+  if (moving && video.paused) {
     console.log("[content] sync: play");
     lastApplied = performance.now();
     try {
@@ -113,7 +133,7 @@ async function apply(video: HTMLVideoElement, state: RoomState): Promise<void> {
       // Chrome blocks play() on a page the viewer hasn't interacted with.
       console.warn("[content] sync: the browser blocked play, press play to catch up", err);
     }
-  } else if (!state.playing && !video.paused) {
+  } else if (!moving && !video.paused) {
     console.log("[content] sync: pause");
     lastApplied = performance.now();
     controls.pause(video);
@@ -144,13 +164,13 @@ function checkDrift(getVideo: () => HTMLVideoElement | null): void {
   // readyState below HAVE_FUTURE_DATA means the video is buffering and its
   // position is frozen, so drift measured now would be misleading.
   const buffering = video ? video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA : false;
-  if (!room?.playing || !video || video.paused || video.seeking || buffering || settling) {
+  if (!room || !isMoving(room) || !video || video.paused || video.seeking || buffering || settling || isAdShowing()) {
     resetSpeed();
     return;
   }
   if (adjusting && adjusting !== video) resetSpeed();
 
-  const drift = video.currentTime - expectedPosition(room); // positive: we're ahead
+  const drift = showTime(video) - expectedPosition(room); // positive: we're ahead
   const size = Math.abs(drift);
 
   if (measureLead) {

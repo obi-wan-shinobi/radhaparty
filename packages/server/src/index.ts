@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
-import { applyAction, join, leave, send, type Client } from "./rooms";
+import { applyAction, join, leave, send, setBlocked, type Client } from "./rooms";
 import { parseClientMessage } from "./validate";
 
 const port = Number(process.env.PORT ?? 8787);
@@ -69,6 +69,8 @@ wss.on("connection", (socket, req) => {
         applyAction(client, msg.action, msg.position);
         return;
       case "status":
+        setBlocked(client, msg.blocked);
+        return;
       case "content":
         console.log(`[server] client ${client.id} sent ${msg.type}, not handled yet`);
         return;

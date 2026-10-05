@@ -22,6 +22,8 @@ type Session = {
   url: string | undefined;
   roomId: string | null;
   server: ServerConnection | null;
+  // In an ad. Sent again after each (re)join, since the server forgets.
+  blocked: boolean;
 };
 
 const sessions = new Map<number, Session>();
@@ -84,6 +86,7 @@ function joinRoom(session: Session, roomId: string): void {
     // its socket closes.
     onOpen: () => {
       server.send({ type: "join", roomId, content: contentFromUrl(session.url) });
+      if (session.blocked) server.send({ type: "status", blocked: true });
     },
     onClock: (offsetMs, roundTripMs) => {
       postToTab(session, { type: "clock", offsetMs });
@@ -136,6 +139,7 @@ chrome.runtime.onConnect.addListener((port) => {
     url: tab.url,
     roomId: null,
     server: null,
+    blocked: false,
   };
   sessions.set(tabId, session);
   console.log(`[background] ${session.label} connected: ${tab.url ?? "unknown url"}`);
@@ -147,7 +151,12 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 
   port.onMessage.addListener((msg: ContentToBackground) => {
-    if (msg.type !== "player-event") return;
+    if (msg.type === "status") {
+      session.blocked = msg.blocked;
+      console.log(`[background] ${session.label} ${msg.blocked ? "is in an ad" : "is out of an ad"}`);
+      session.server?.send(msg);
+      return;
+    }
     const { type, position } = msg.event;
     if (!session.server) {
       console.log(`[background] ${session.label} ${type} at ${position.toFixed(2)}s (not in a room)`);
